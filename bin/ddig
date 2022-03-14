@@ -1,21 +1,21 @@
-#!/bin/bash
+#! /bin/bash
 
 function prereq() {
 
   if type dig > /dev/null 2>&1; then
-    DIG=$(which dig)
+    DIG="$(which dig)"
     ARGS=(+short +tcp)
   elif type kdig > /dev/null 2>&1; then
-    DIG=$(which kdig)
+    DIG="$(which kdig)"
     ARGS=(+short +tcp)
   elif type drill > /dev/null 2>&1; then
-    if [[ $($(which drill) -v | grep -Po 'drill version \K[^(]*' | sed 's/.//g') -le 180 ]]; then
+    DIG="$(which drill)"
+    ARGS=(-Q -t)
+
+    if [[ $("${DIG}" -v | grep -Po 'drill version \K[^(]*' | sed 's/.//g') -le 180 ]]; then
       echo 'Your installed version of "drill" is unsupported.'
       echo 'Version > 1.8.0 required for "short" functionality.'
       exit 1
-    else
-      DIG=$(which drill)
-      ARGS=(-Q -t)
     fi
   else
     echo 'Could not find "dig" or "drill", this function will not work.'
@@ -28,12 +28,12 @@ function recursive_cname() {
 
   local cname_record
 
-  cname_record=$("$DIG" "${ARGS[@]}" "$@" | head -n1)
-  if ! [[ (( "$cname_record" =~ ^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}[0-9]{1,3} )) || (( -z "$cname_record" )) ]]; then
+  cname_record="$("${DIG}" "${ARGS[@]}" "$@" | head -n1)"
+  if ! [[ (( "${cname_record}" =~ ^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}[0-9]{1,3} )) || (( -z "${cname_record}" )) ]]; then
     cname="yes"
     echo "${1} resolves to ${cname_record}"
-    fcname_record="$cname_record"
-    recursive_cname "$cname_record"
+    fcname_record="${cname_record}"
+    recursive_cname "${cname_record}"
   else
     return 1
   fi
@@ -45,7 +45,7 @@ function whois_stuff() {
   local WHOIS STRING
 
   if type whois > /dev/null 2>&1; then
-    WHOIS=$(which whois)
+    WHOIS="$(which whois)"
     STRING='^NetName:|^Organization:|^OrgName:|^OrgId:'
   else
     return 1
@@ -59,13 +59,13 @@ function a_stuff() {
 
   while read -r ip; do
     echo "A: ${ip}"
-    if [ -n "$ip" ]; then
-      whois_stuff "$ip"
+    if [ -n "${ip}" ]; then
+      whois_stuff "${ip}"
       while read -r record; do
         echo "PTR: ${record}"
-      done < <("$DIG" "${ARGS[@]}" -x "$ip")
+      done < <("${DIG}" "${ARGS[@]}" -x "${ip}")
     fi
-  done < <("$DIG" "${ARGS[@]}" A "$1")
+  done < <("${DIG}" "${ARGS[@]}" A "$1")
 
 }
 
@@ -73,17 +73,17 @@ function other_stuff() {
 
   while read -r record; do
     echo "MX: ${record}"
-  done < <("$DIG" "${ARGS[@]}" MX "$1")
+  done < <("${DIG}" "${ARGS[@]}" MX "$1")
 
   while read -r record; do
     echo "NS: ${record}"
-  done < <("$DIG" "${ARGS[@]}" NS "$1")
+  done < <("${DIG}" "${ARGS[@]}" NS "$1")
 
   while read -r record; do
     echo "TXT: ${record}"
-  done < <("$DIG" "${ARGS[@]}" TXT "$1")
+  done < <("${DIG}" "${ARGS[@]}" TXT "$1")
 
-  echo "DMARC: $("$DIG" "${ARGS[@]}" TXT _dmarc."$1")"
+  echo "DMARC: $("${DIG}" "${ARGS[@]}" TXT _dmarc."$1")"
 
 }
 
@@ -93,9 +93,9 @@ function main() {
 
   recursive_cname "$1"
 
-  if [[ "$cname" = "yes" ]]; then
+  if [[ "${cname}" = "yes" ]]; then
     echo -e "\nResolving IPs for ${fcname_record}:"
-    a_stuff "$fcname_record"
+    a_stuff "${fcname_record}"
     echo -e "\n${1} is a CNAME, no additional records set."
   else
     a_stuff "$1"
