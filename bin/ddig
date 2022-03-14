@@ -1,6 +1,6 @@
-#! /bin/bash
+#!/bin/bash
 
-function prereq() {
+prereq() {
 
   if type dig > /dev/null 2>&1; then
     DIG="$(which dig)"
@@ -24,7 +24,7 @@ function prereq() {
 
 }
 
-function recursive_cname() {
+recursive_cname() {
 
   local cname_record
 
@@ -40,7 +40,7 @@ function recursive_cname() {
 
 }
 
-function whois_stuff() {
+whois_stuff() {
 
   local WHOIS STRING
 
@@ -55,39 +55,42 @@ function whois_stuff() {
     
 }
 
-function a_stuff() {
+record_check() {
 
-  while read -r ip; do
-    echo "A: ${ip}"
-    if [ -n "${ip}" ]; then
-      whois_stuff "${ip}"
+  local record_type
+  local -a records
+
+  record_type="$2"
+
+  if [[ -z "${record_type}" ]]; then
+    return 1
+  fi
+
+  if [[ "${record_type}" = "PTR" ]]; then
+    records=( "$("${DIG}" "${ARGS[@]}" "-x" "$1")" )
+    whois_stuff "$1"
+    while read -r record; do
+      echo "${record_type}: ${record}"
+    done < <(echo "${records[@]}")
+  elif [[ "${record_type}" = "DMARC" ]]; then
+    echo "DMARC: $("${DIG}" "${ARGS[@]}" TXT _dmarc."$1")"
+  else
+    records=( "$("${DIG}" "${ARGS[@]}" "$record_type" "$1")" )
+    if [[ -n "${records[@]}" ]]; then
       while read -r record; do
-        echo "PTR: ${record}"
-      done < <("${DIG}" "${ARGS[@]}" -x "${ip}")
+        echo "${record_type}: ${record}"
+        if [[ "${record_type}" = "A" ]]; then
+          record_check "${record}" "PTR"
+        fi
+      done < <(echo "${records[@]}")
+    else
+      echo "No ${record_type} record found for $1"
     fi
-  done < <("${DIG}" "${ARGS[@]}" A "$1")
+  fi
 
 }
 
-function other_stuff() {
-
-  while read -r record; do
-    echo "MX: ${record}"
-  done < <("${DIG}" "${ARGS[@]}" MX "$1")
-
-  while read -r record; do
-    echo "NS: ${record}"
-  done < <("${DIG}" "${ARGS[@]}" NS "$1")
-
-  while read -r record; do
-    echo "TXT: ${record}"
-  done < <("${DIG}" "${ARGS[@]}" TXT "$1")
-
-  echo "DMARC: $("${DIG}" "${ARGS[@]}" TXT _dmarc."$1")"
-
-}
-
-function main() {
+main() {
 
   prereq
 
@@ -98,8 +101,9 @@ function main() {
     a_stuff "${fcname_record}"
     echo -e "\n${1} is a CNAME, no additional records set."
   else
-    a_stuff "$1"
-    other_stuff "$1"
+    for record_type in A MX NS TXT DMARC; do
+      record_check "$1" "${record_type}"
+    done
   fi
 
 }
