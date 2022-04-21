@@ -2,22 +2,36 @@
 
 prereq() {
 
-  if type dig > /dev/null 2>&1; then
-    DIG="$(which dig)"
-    ARGS=(+short +tcp)
-  elif type kdig > /dev/null 2>&1; then
-    DIG="$(which kdig)"
-    ARGS=(+short +tcp)
-  elif type drill > /dev/null 2>&1; then
-    DIG="$(which drill)"
-    ARGS=(-Q -t)
+  for program in dig kdig drill; do
+    case "${program}" in
+    dig)
+      type "${program}" >/dev/null 2>&1 || continue
+      DIG="$(which dig)"
+      ARGS=(+short +tcp)
+      break
+      ;;
+    kdig)
+      type "${program}" >/dev/null 2>&1 || continue
+      DIG="$(which kdig)"
+      ARGS=(+short +tcp)
+      break
+      ;;
+    drill)
+      type "${program}" >/dev/null 2>&1 || continue
+      DIG="$(which drill)"
+      ARGS=(-Q -t)
 
-    if [[ $("${DIG}" -v | grep -Po 'drill version \K[^(]*' | sed 's/.//g') -le 180 ]]; then
-      echo 'Your installed version of "drill" is unsupported.'
-      echo 'Version > 1.8.0 required for "short" functionality.'
-      exit 1
-    fi
-  else
+      if [[ $("${DIG}" -v | grep -Po 'drill version \K[^(]*' | sed 's/\.//g') -le 180 ]]; then
+        echo 'Your installed version of "drill" is unsupported.'
+        echo 'Version > 1.8.0 required for "short" functionality.'
+        exit 1
+      fi
+      break
+      ;;
+    esac
+  done
+
+  if [ -z "${DIG}" ]; then
     echo 'Could not find "dig" or "drill", this function will not work.'
     exit 1
   fi
@@ -29,7 +43,7 @@ recursive_cname() {
   local cname_record
 
   cname_record="$("${DIG}" "${ARGS[@]}" "$@" | head -n1)"
-  if ! [[ (( "${cname_record}" =~ ^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}[0-9]{1,3} )) || (( -z "${cname_record}" )) ]]; then
+  if ! [[ (("${cname_record}" =~ ^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}[0-9]{1,3})) || ((-z "${cname_record}")) ]]; then
     cname="yes"
     echo "${1} resolves to ${cname_record}"
     fcname_record="${cname_record}"
@@ -44,7 +58,7 @@ whois_stuff() {
 
   local WHOIS STRING
 
-  if type whois > /dev/null 2>&1; then
+  if type whois >/dev/null 2>&1; then
     WHOIS="$(which whois)"
     STRING='^NetName:|^Organization:|^OrgName:|^OrgId:'
   else
@@ -52,7 +66,7 @@ whois_stuff() {
   fi
 
   "$WHOIS" "$1" | grep -E "$STRING" | head -n4
-    
+
 }
 
 record_check() {
@@ -66,27 +80,40 @@ record_check() {
     return 1
   fi
 
-  if [[ "${record_type}" = "PTR" ]]; then
-    records=( "$("${DIG}" "${ARGS[@]}" "-x" "$1")" )
-    whois_stuff "$1"
-    while read -r record; do
-      echo "${record_type}: ${record}"
-    done < <(echo "${records[@]}")
-  elif [[ "${record_type}" = "DMARC" ]]; then
-    echo "DMARC: $("${DIG}" "${ARGS[@]}" TXT _dmarc."$1")"
-  else
-    records=( "$("${DIG}" "${ARGS[@]}" "$record_type" "$1")" )
-    if [[ -n "${records[@]}" ]]; then
+  case "${record_type}" in
+  A)
+    records=("$("${DIG}" "${ARGS[@]}" "$record_type" "$1")")
+    if [[ "${#records[@]}" -gt 0 ]]; then
       while read -r record; do
         echo "${record_type}: ${record}"
-        if [[ "${record_type}" = "A" ]]; then
-          record_check "${record}" "PTR"
-        fi
+        record_check "${record}" "PTR"
       done < <(echo "${records[@]}")
     else
       echo "No ${record_type} record found for $1"
     fi
-  fi
+    ;;
+  DMARC)
+    echo "DMARC: $("${DIG}" "${ARGS[@]}" TXT _dmarc."$1")"
+    ;;
+  PTR)
+    records=("$("${DIG}" "${ARGS[@]}" "-x" "$1")")
+    whois_stuff "$1"
+    while read -r record; do
+      echo "${record_type}: ${record}"
+    done < <(echo "${records[@]}")
+    ;;
+  *)
+    records=("$("${DIG}" "${ARGS[@]}" "$record_type" "$1")")
+    if [[ "${#records[@]}" -gt 0 ]]; then
+      while read -r record; do
+        echo "${record_type}: ${record}"
+      done < <(echo "${records[@]}") | sort -Vf
+      echo
+    else
+      echo "No ${record_type} record found for $1"
+    fi
+    ;;
+  esac
 
 }
 
@@ -109,3 +136,4 @@ main() {
 }
 
 main "$@"
+
