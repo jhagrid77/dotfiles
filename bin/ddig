@@ -81,7 +81,7 @@ record_check() {
   fi
 
   case "${record_type}" in
-  A)
+  A|AAAA)
     records=("$("${DIG}" "${ARGS[@]}" "$record_type" "$1")")
     if [[ "${#records[@]}" -gt 0 ]]; then
       while read -r record; do
@@ -91,6 +91,7 @@ record_check() {
     else
       echo "No ${record_type} record found for $1"
     fi
+    echo
     ;;
   DMARC)
     echo "DMARC: $("${DIG}" "${ARGS[@]}" TXT _dmarc."$1")"
@@ -104,14 +105,14 @@ record_check() {
     ;;
   *)
     records=("$("${DIG}" "${ARGS[@]}" "$record_type" "$1")")
-    if [[ "${#records[@]}" -gt 0 ]]; then
+    if [[ -n "${records}" ]]; then
       while read -r record; do
         echo "${record_type}: ${record}"
       done < <(echo "${records[@]}") | sort -Vf
-      echo
     else
       echo "No ${record_type} record found for $1"
     fi
+    echo
     ;;
   esac
 
@@ -128,7 +129,7 @@ main() {
     record_check "${fcname_record}" A
     echo -e "\n${1} is a CNAME, no additional records set."
   else
-    for record_type in A MX NS TXT DMARC; do
+    for record_type in A AAAA MX NS TXT DMARC; do
       record_check "$1" "${record_type}"
     done
   fi
