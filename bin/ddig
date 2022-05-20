@@ -127,7 +127,7 @@ main() {
   if [[ "${cname}" = "yes" ]]; then
     echo -e "\nResolving IPs for ${fcname_record}:"
     record_check "${fcname_record}" A
-    echo -e "\n${1} is a CNAME, no additional records set."
+    echo -e "${1} is a CNAME, no additional records set."
   else
     for record_type in A AAAA MX NS TXT DMARC; do
       record_check "$1" "${record_type}"
