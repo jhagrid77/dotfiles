@@ -83,7 +83,7 @@ record_check() {
   case "${record_type}" in
   A|AAAA)
     records=("$("${DIG}" "${ARGS[@]}" "$record_type" "$1")")
-    if [[ "${#records[@]}" -gt 0 ]]; then
+    if [[ -n "${records}" ]]; then
       while read -r record; do
         echo "${record_type}: ${record}"
         record_check "${record}" "PTR"
