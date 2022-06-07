@@ -129,7 +129,7 @@ main() {
     record_check "${fcname_record}" A
     echo -e "${1} is a CNAME, no additional records set."
   else
-    for record_type in A AAAA MX NS TXT DMARC; do
+    for record_type in A AAAA MX NS CAA TXT DMARC; do
       record_check "$1" "${record_type}"
     done
   fi
