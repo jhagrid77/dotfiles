@@ -43,7 +43,7 @@ recursive_cname() {
   local cname_record
 
   cname_record="$("${DIG}" "${ARGS[@]}" "$@" | head -n1)"
-  if ! [[ (("${cname_record}" =~ ^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}[0-9]{1,3})) || ((-z "${cname_record}")) ]]; then
+  if ! [[ "${cname_record}" =~ ^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$ || -z "${cname_record}" ]]; then
     cname="yes"
     echo "${1} resolves to ${cname_record}"
     fcname_record="${cname_record}"
