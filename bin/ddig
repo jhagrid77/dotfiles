@@ -31,7 +31,7 @@ prereq() {
     esac
   done
 
-  if [ -z "${DIG}" ]; then
+  if [[ -z "${DIG}" ]]; then
     echo 'Could not find "dig" or "drill", this function will not work.'
     exit 1
   fi
