@@ -94,7 +94,7 @@ record_check() {
     echo
     ;;
   DMARC)
-    echo "DMARC: $("${DIG}" "${ARGS[@]}" TXT _dmarc."$1")"
+    echo "DMARC: $("${DIG}" "${ARGS[@]}" TXT _dmarc."$1" | sed 's/" "//g')"
     ;;
   PTR)
     records=("$("${DIG}" "${ARGS[@]}" "-x" "$1")")
@@ -104,7 +104,11 @@ record_check() {
     done < <(echo "${records[@]}")
     ;;
   *)
-    records=("$("${DIG}" "${ARGS[@]}" "$record_type" "$1")")
+    if [[ "${record_type}" = "TXT" ]]; then
+      records=("$("${DIG}" "${ARGS[@]}" "$record_type" "$1" | sed 's/" "//g')")
+    else
+      records=("$("${DIG}" "${ARGS[@]}" "$record_type" "$1")")
+    fi
     if [[ -n "${records}" ]]; then
       while read -r record; do
         echo "${record_type}: ${record}"
@@ -126,7 +130,9 @@ main() {
 
   if [[ "${cname}" = "yes" ]]; then
     echo -e "\nResolving IPs for ${fcname_record}:"
-    record_check "${fcname_record}" A
+    for record_type in A AAAA; do
+      record_check "${fcname_record}" "${record_type}"
+    done
     echo -e "${1} is a CNAME, no additional records set."
   else
     for record_type in A AAAA MX NS CAA TXT DMARC; do
